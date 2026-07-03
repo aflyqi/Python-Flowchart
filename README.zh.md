@@ -11,6 +11,8 @@
 
 将 Python 源码自动生成**可交互的流程图**（Flowchart），支持 **文件级 / 函数级 / 类级 / 项目级** 四种视图，双击 drill-down 查看内部实现，代码 ↔ 流程图**双向同步**，**双屏 Popout**，**自动跳转（Auto-Jump）**，以及丰富的右键交互。
 
+![Showcase](./assets/show_1.png)
+
 ---
 
 ## 快速开始
