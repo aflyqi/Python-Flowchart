@@ -33,3 +33,4 @@ Thumbs.db
 
 # Project specific
 *.png
+!assets/*.png
