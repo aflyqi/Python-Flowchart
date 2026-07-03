@@ -3,9 +3,7 @@
 [![en](https://img.shields.io/badge/lang-en-red.svg)](README.md)
 [![zh](https://img.shields.io/badge/lang-zh-blue.svg)](README.zh.md)
 
-> **In te **[truncated 15KB]** </fixed_string>
-
-English README content (full details below)
+> **Python Flowchart** — Visual code-to-flowchart tool. Supports File / Function / Class / Project views, bidirectional Sync, dual-monitor Popout, Auto-Jump, and rich right-click interactions.
 
 ---
 
