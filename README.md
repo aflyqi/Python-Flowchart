@@ -5,6 +5,8 @@
 
 > **Python Flowchart** — Visual code-to-flowchart tool. Supports File / Function / Class / Project views, bidirectional Sync, dual-monitor Popout, Auto-Jump, and rich right-click interactions.
 
+![Showcase_1](./assets/show_1.png)
+
 ---
 
 ## Python Flowchart — Visual Code-to-Flowchart Tool
