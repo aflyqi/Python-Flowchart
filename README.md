@@ -180,33 +180,7 @@ Export the current flowchart as a PNG image.
 
 ### Architecture
 
-```
-┌────────────────────────────────────────────────────────────┐
-│                    Browser (React + React Flow)             │
-│  ┌─────────────┐  ┌──────────────┐  ┌───────────────────┐  │
-│  │ Monaco Editor│  │  ControlPanel│  │   FlowCanvas      │  │
-│  │ (code edit)  │  │ (toggles)    │  │ (dagre + ReactFlow)│  │
-│  └──────┬──────┘  └──────┬───────┘  └────────┬──────────┘  │
-│         │                │                    │             │
-│         └────────────────┼────────────────────┘             │
-│                    fetch / API                              │
-└───────────────────────────┼────────────────────────────────┘
-                            │
-                    POST /api/parse
-                    POST /api/function, /api/class, /api/project
-                            │
-┌───────────────────────────┼────────────────────────────────┐
-│              FastAPI Server + Static Files                  │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │           FlowGraphBuilder (ast_parser.py)             │  │
-│  │  ┌──────────┐  ┌──────────┐  ┌────────────────────┐  │  │
-│  │  │ parse_source│ │ parse_function│ │ parse_class   │  │  │
-│  │  │ (collect all)│ │ (func body)  │ │ (class body)  │  │  │
-│  │  └──────────┘  └──────────┘  └────────────────────┘  │  │
-│  │  _visit_block / _visit_stmt / _visit_for / ...         │  │
-│  └───────────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────┘
-```
+![Architecture Diagram](./assets/architecture.png)
 
 ### Data Flow
 
