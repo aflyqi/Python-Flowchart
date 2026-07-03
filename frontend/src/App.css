@@ -1,0 +1,257 @@
+/* ── Python Flowchart App ────────────────────────────────────────────── */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: #0d1117;
+  color: #c9d1d9;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────── */
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 20px;
+  background: #161b22;
+  border-bottom: 1px solid #21262d;
+  flex-shrink: 0;
+  min-height: 48px;
+}
+
+.app-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #58a6ff;
+}
+
+.app-title span {
+  color: #8b949e;
+  font-weight: 400;
+}
+
+/* ── Body ─────────────────────────────────────────────────────────────── */
+
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.panel {
+  overflow: hidden;
+}
+
+.panel-left {
+  width: 420px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #21262d;
+}
+
+.panel-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ── Error ────────────────────────────────────────────────────────────── */
+
+.flow-error {
+  background: #2d1216;
+  border: 1px solid #da3633;
+  border-radius: 8px;
+  padding: 14px 18px;
+  color: #f85149;
+  font-size: 13px;
+  white-space: pre-wrap;
+  max-height: 120px;
+  overflow-y: auto;
+  margin: 0 10px 10px;
+  flex-shrink: 0;
+}
+
+/* ── Loading Spinner ──────────────────────────────────────────────────── */
+
+.spinner-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #21262d;
+  border-top-color: #58a6ff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Highlighted node (sync) ──────────────────────────────────────────── */
+
+.flow-node-highlighted > div {
+  box-shadow: 0 0 0 3px #58a6ff, 0 0 20px rgba(88, 166, 255, 0.4) !important;
+  animation: sync-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes sync-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px #58a6ff, 0 0 20px rgba(88, 166, 255, 0.4); }
+  50% { box-shadow: 0 0 0 5px #58a6ff, 0 0 32px rgba(88, 166, 255, 0.6); }
+}
+
+/* ── Empty State ──────────────────────────────────────────────────────── */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: #484f58;
+  font-size: 14px;
+  gap: 6px;
+  user-select: none;
+}
+
+.empty-state .icon,
+.empty-icon {
+  font-size: 48px;
+  opacity: 0.3;
+  margin-bottom: 8px;
+}
+
+.empty-state .hint,
+.empty-hints {
+  font-size: 12px;
+  color: #30363d;
+  margin-top: 8px;
+}
+
+.empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #8b949e;
+  margin-bottom: 4px;
+}
+
+.empty-desc {
+  font-size: 12px;
+  color: #484f58;
+  text-align: center;
+  line-height: 1.6;
+}
+
+/* ── Resize Handle ────────────────────────────────────────────────────── */
+
+.resize-handle {
+  width: 6px;
+  cursor: col-resize;
+  background: transparent;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 5;
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 40px;
+  background: #484f58;
+  border-radius: 1px;
+}
+
+.resize-handle:hover {
+  background: #30363d !important;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+
+@media (max-width: 800px) {
+  .app-body {
+    flex-direction: column;
+  }
+
+  .panel-left {
+    width: 100%;
+    height: 40%;
+    min-width: unset;
+    border-right: none;
+    border-bottom: 1px solid #21262d;
+  }
+
+  .panel-right {
+    height: 60%;
+  }
+}
+
+/* ── React Flow Controls: dark theme ─────────────────────────────────── */
+
+.flow-controls button {
+  background: #161b22 !important;
+  border-color: #30363d !important;
+  color: #c9d1d9 !important;
+}
+
+.flow-controls button:hover {
+  background: #21262d !important;
+}
+
+.flow-controls button svg {
+  fill: #c9d1d9 !important;
+}
+
+/* ── Monaco Find Widget fixes ─────────────────────────────────────── */
+
+/* Flow container takes remaining space */
+.flow-container {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+.flow-container .react-flow {
+  height: 100%;
+}
+
+/* Hide the hover tooltip on find-widget close button (prevents flashing) */
+.monaco-editor .find-widget .monaco-button[title]:hover::after,
+.monaco-editor .find-widget .button[title]:hover::after {
+  display: none !important;
+}
