@@ -1,0 +1,671 @@
+:root {
+  /* ── Color Palette ──────────────────────────────────────── */
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #12121a;
+  --bg-tertiary: #1a1a28;
+  --bg-card: #1e1e30;
+  --bg-hover: #252540;
+  --bg-active: #2a2a4a;
+
+  --border-default: #2a2a3e;
+  --border-hover: #3a3a5e;
+  --border-focus: #6c6cf0;
+
+  --text-primary: #e8e8f0;
+  --text-secondary: #9898b0;
+  --text-tertiary: #686880;
+  --text-muted: #484858;
+
+  --accent-primary: #6c6cf0;
+  --accent-secondary: #8b5cf6;
+  --accent-glow: rgba(108, 108, 240, 0.25);
+  --accent-gradient: linear-gradient(135deg, #6c6cf0, #8b5cf6, #a855f7);
+
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #3b82f6;
+
+  /* Node Colors */
+  --node-entry: #22c55e;
+  --node-exit: #ef4444;
+  --node-statement: #3b82f6;
+  --node-condition: #f59e0b;
+  --node-loop: #06b6d4;
+  --node-call: #a855f7;
+  --node-break: #f97316;
+  --node-continue: #eab308;
+  --node-comment: #22c55e;
+  --node-class: #8b5cf6;
+
+  /* Spacing */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 20px var(--accent-glow);
+
+  /* Typography */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Consolas', monospace;
+}
+
+/* ── Reset ──────────────────────────────────────────────────── */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── App Layout ──────────────────────────────────────────────── */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 24px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-default);
+  flex-shrink: 0;
+  min-height: 52px;
+}
+
+.app-title {
+  font-size: 17px;
+  font-weight: 700;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.app-title span {
+  font-weight: 400;
+  font-size: 13px;
+  -webkit-text-fill-color: var(--text-secondary);
+}
+
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── Panels ──────────────────────────────────────────────────── */
+.panel {
+  overflow: hidden;
+}
+
+.panel-left {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border-default);
+  background: var(--bg-primary);
+}
+
+.panel-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-primary);
+}
+
+/* ── Code Editor Panel ─────────────────────────────────────── */
+.code-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-default);
+  flex-shrink: 0;
+  min-height: 40px;
+}
+
+.code-panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.code-panel-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* ── Buttons ────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+}
+
+.btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+}
+
+.btn-primary {
+  background: var(--accent-gradient);
+  border-color: transparent;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+  box-shadow: var(--shadow-glow);
+}
+
+.btn-icon {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+}
+
+/* ── Toggle Switch ──────────────────────────────────────────── */
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-track {
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
+  position: relative;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.2s ease;
+}
+
+.toggle-label {
+  font-size: 11px;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+/* ── Control Panel ──────────────────────────────────────────── */
+.control-panel {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-default);
+  flex-shrink: 0;
+}
+
+.control-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  flex-wrap: wrap;
+}
+
+.control-bottom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-top: 1px solid var(--border-default);
+  flex-wrap: wrap;
+}
+
+.control-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-default);
+  flex-shrink: 0;
+}
+
+/* ── Function Select ────────────────────────────────────────── */
+.fn-select {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  max-width: 220px;
+}
+
+.fn-select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+/* ── Breadcrumb ─────────────────────────────────────────────── */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.breadcrumb-item {
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.breadcrumb-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.breadcrumb-item.active {
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.breadcrumb-sep {
+  color: var(--text-muted);
+}
+
+/* ── Number Input ────────────────────────────────────────────── */
+.num-input-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.num-btn {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  padding: 0;
+}
+
+.num-btn:hover {
+  background: var(--bg-hover);
+}
+
+.num-input {
+  width: 28px;
+  height: 20px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  text-align: center;
+  font-size: 11px;
+  padding: 1px 0;
+  font-family: var(--font-mono);
+}
+
+.num-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+/* ── Flow Container ──────────────────────────────────────────── */
+.flow-container {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+.flow-container .react-flow {
+  height: 100%;
+}
+
+/* ── Flow Controls Dark Theme ──────────────────────────────── */
+.flow-controls button {
+  background: var(--bg-card) !important;
+  border-color: var(--border-default) !important;
+  color: var(--text-primary) !important;
+}
+
+.flow-controls button:hover {
+  background: var(--bg-hover) !important;
+}
+
+.flow-controls button svg {
+  fill: var(--text-primary) !important;
+}
+
+/* ── Empty State ────────────────────────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 12px;
+  padding: 40px;
+}
+
+.empty-icon {
+  font-size: 64px;
+  opacity: 0.15;
+  margin-bottom: 8px;
+}
+
+.empty-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.empty-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.6;
+  max-width: 400px;
+}
+
+/* ── Highlighted Node ────────────────────────────────────────── */
+.flow-node-highlighted > div {
+  box-shadow: 0 0 0 3px var(--accent-primary), 0 0 24px var(--accent-glow) !important;
+  animation: sync-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes sync-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px var(--accent-primary), 0 0 24px var(--accent-glow); }
+  50% { box-shadow: 0 0 0 6px var(--accent-primary), 0 0 40px var(--accent-glow); }
+}
+
+/* ── Context Menu ────────────────────────────────────────────── */
+.context-menu {
+  position: fixed;
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+  overflow: hidden;
+  min-width: 170px;
+  backdrop-filter: blur(12px);
+}
+
+.context-menu-header {
+  padding: 7px 14px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-default);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.context-menu-item:hover {
+  background: var(--bg-hover);
+}
+
+/* ── Inspect Popup ──────────────────────────────────────────── */
+.inspect-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.inspect-modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  max-width: 560px;
+  max-height: 70vh;
+  overflow: auto;
+  box-shadow: var(--shadow-lg);
+}
+
+.inspect-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.inspect-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent-primary);
+}
+
+.inspect-close {
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.inspect-close:hover {
+  background: var(--bg-hover);
+}
+
+.inspect-content {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  line-height: 1.5;
+}
+
+/* ── Toast Overrides ─────────────────────────────────────────── */
+.toast-container {
+  z-index: 9999;
+}
+
+/* ── Loading ────────────────────────────────────────────────── */
+.loading-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border-default);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
+
+/* ── React Flow Background ──────────────────────────────────── */
+.react-flow__background {
+  background: var(--bg-primary) !important;
+}
+
+/* ── Controls Background ────────────────────────────────────── */
+.react-flow__controls {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-default) !important;
+  border-radius: var(--radius-md) !important;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+/* ── MiniMap ─────────────────────────────────────────────────── */
+.react-flow__minimap {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-default) !important;
+  border-radius: var(--radius-md) !important;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+/* ── Edge Labels ────────────────────────────────────────────── */
+.react-flow__edge-textbg {
+  fill: var(--bg-secondary);
+}
+
+.react-flow__edge-text {
+  fill: var(--text-secondary);
+  font-size: 10px;
+}
+
+/* ── Resize Handle ─────────────────────────────────────────── */
+.resize-handle {
+  width: 5px;
+  cursor: col-resize;
+  background: transparent;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 5;
+  transition: background 0.15s ease;
+}
+
+.resize-handle:hover,
+.resize-handle.active {
+  background: var(--accent-glow);
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 40px;
+  background: var(--border-default);
+  border-radius: 1px;
+  transition: background 0.15s ease;
+}
+
+.resize-handle:hover::after {
+  background: var(--accent-primary);
+}
+
+/* ── Popout Only ────────────────────────────────────────────── */
+.popout-container {
+  height: 100%;
+  background: var(--bg-primary);
+}
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 800px) {
+  .app-body {
+    flex-direction: column;
+  }
+  .panel-left {
+    width: 100% !important;
+    height: 40%;
+    min-width: unset;
+    border-right: none;
+    border-bottom: 1px solid var(--border-default);
+  }
+  .panel-right {
+    height: 60%;
+  }
+}

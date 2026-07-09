@@ -1,42 +1,29 @@
-// Types shared across the frontend
+// ── Core Type Definitions ──────────────────────────────────────────────
 
 export interface FlowNodeData {
-  [key: string]: unknown;
   label: string;
-  nodeType: string; // entry, exit, condition, loop, statement, call, function, try, except, merge, error
-  funcName?: string;
+  nodeType: string;
   lineNo?: number;
-  expandable?: boolean;
+  funcName?: string;
   callName?: string;
-  filepath?: string;
-  projectView?: boolean;
-  signature?: boolean;
-  endpoint?: boolean;
-  return?: boolean;
-  raise?: boolean;
-  break?: boolean;
-  continue?: boolean;
-  empty?: boolean;
-  nested?: boolean;
-  with?: boolean;
-  // Block grouping
+  expandable?: boolean;
+  isClass?: boolean;
   blockId?: string;
-  blockType?: string;
-  // Comment
-  collapsed?: boolean;
+  isGroupBox?: boolean;
+  groupType?: string;
+  groupLabel?: string;
   commentText?: string;
-  isDocstring?: boolean;
-  commentStart?: number;
-  commentEnd?: number;
+  collapsed?: boolean;
+  inspect?: Record<string, unknown>;
+  extra?: Record<string, unknown>;
+  sourceLine?: number;
 }
 
 export interface FlowNode {
   id: string;
   type: string;
   data: FlowNodeData;
-  position: { x: number; y: number };
-  style?: Record<string, unknown>;
-  className?: string;
+  position?: { x: number; y: number };
 }
 
 export interface FlowEdge {
@@ -46,8 +33,7 @@ export interface FlowEdge {
   label?: string;
   type?: string;
   animated?: boolean;
-  sourceHandle?: string;
-  targetHandle?: string;
+  style?: Record<string, string>;
 }
 
 export interface FlowBlock {
@@ -55,19 +41,7 @@ export interface FlowBlock {
   type: string;
   label: string;
   nodeIds: string[];
-  color: string;
-  border: string;
-}
-
-export interface ParseResult {
-  nodes: FlowNode[];
-  edges: FlowEdge[];
-  blocks?: FlowBlock[];
-  functions?: FunctionInfo[];
-  defined_functions?: FunctionInfo[];
-  errors?: ParseError[];
-  file_count?: number;
-  function_name?: string;
+  parentId?: string;
 }
 
 export interface FunctionInfo {
@@ -77,13 +51,20 @@ export interface FunctionInfo {
   end_lineno?: number;
 }
 
-export interface ParseError {
-  line: number;
-  offset: number;
-  msg: string;
-}
-
 export interface BreadcrumbItem {
   label: string;
   funcName?: string;
+  isClass?: boolean;
+}
+
+export type ViewMode = 'file' | 'function' | 'project';
+
+export interface ParseResult {
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+  blocks?: FlowBlock[];
+  defined_functions?: FunctionInfo[];
+  functions?: FunctionInfo[];
+  errors?: string[];
+  is_file_view?: boolean;
 }

@@ -2,80 +2,51 @@ import type { ParseResult } from './types';
 
 const BASE_URL = '/api';
 
-export async function parseCode(
-  source: string,
-  filepath = '',
-  enableStructGroups = false,
-  enableChunkGroups = false
-): Promise<ParseResult> {
-  const res = await fetch(`${BASE_URL}/parse`, {
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ source, filepath, enable_struct_groups: enableStructGroups, enable_chunk_groups: enableChunkGroups }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || 'Parse failed');
+    const text = await res.text();
+    throw new Error(text.slice(0, 200));
   }
   return res.json();
 }
 
-export async function parseFunction(
+export function parseCode(
   source: string,
-  funcName: string,
   filepath = '',
-  maxDepth = 0,
-  enableStructGroups = false,
-  enableChunkGroups = false
+  enable_struct_groups = false,
+  enable_chunk_groups = false
 ): Promise<ParseResult> {
-  const res = await fetch(`${BASE_URL}/function`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      source, func_name: funcName, filepath, max_depth: maxDepth,
-      enable_struct_groups: enableStructGroups,
-      enable_chunk_groups: enableChunkGroups,
-    }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || 'Parse failed');
-  }
-  return res.json();
+  return post('/parse', { source, filepath, enable_struct_groups, enable_chunk_groups });
 }
 
-export async function parseProject(rootDir: string): Promise<ParseResult> {
-  const res = await fetch(`${BASE_URL}/project`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ root_dir: rootDir }),
+export function parseFunction(
+  source: string,
+  func_name: string,
+  filepath = '',
+  max_depth = 0,
+  enable_struct_groups = false,
+  enable_chunk_groups = false
+): Promise<ParseResult> {
+  return post('/function', {
+    source, func_name, filepath, max_depth,
+    enable_struct_groups, enable_chunk_groups,
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || 'Project load failed');
-  }
-  return res.json();
 }
 
-export async function parseClass(
+export function parseClass(
   source: string,
-  className: string,
+  class_name: string,
   filepath = '',
-  enableStructGroups = false,
-  enableChunkGroups = false
+  enable_struct_groups = false,
+  enable_chunk_groups = false
 ): Promise<ParseResult> {
-  const res = await fetch(`${BASE_URL}/class`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      source, class_name: className, filepath,
-      enable_struct_groups: enableStructGroups,
-      enable_chunk_groups: enableChunkGroups,
-    }),
+  return post('/class', {
+    source, class_name, filepath,
+    enable_struct_groups, enable_chunk_groups,
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || 'Parse class failed');
-  }
-  return res.json();
 }

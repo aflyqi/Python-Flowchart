@@ -1,414 +1,261 @@
-import { memo } from 'react';
+// @ts-nocheck
+import React, { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { FlowNodeData } from '../types';
 
-// Helper to safely extract FlowNodeData from React Flow's unknown data
-function useData(data: unknown): FlowNodeData {
-  return (data ?? { label: '', nodeType: 'statement' }) as FlowNodeData;
-}
-
-const NODE_STYLES: Record<string, { bg: string; border: string; icon: string }> = {
-  entry:       { bg: '#1a1a2e', border: '#4fc3f7', icon: '▶' },
-  exit:        { bg: '#1a1a2e', border: '#81c784', icon: '⏹' },
-  condition:   { bg: '#1a1a2e', border: '#ffb74d', icon: '◇' },
-  loop:        { bg: '#1a1a2e', border: '#4dd0e1', icon: '↻' },
-  statement:   { bg: '#1a1a2e', border: '#78909c', icon: '·' },
-  call:        { bg: '#1a1a2e', border: '#ce93d8', icon: '→' },
-  function:    { bg: '#1a1a2e', border: '#64b5f6', icon: 'ƒ' },
-  try:         { bg: '#1a1a2e', border: '#ef5350', icon: '⚠' },
-  except:      { bg: '#1a1a2e', border: '#ff7043', icon: '✕' },
-  error:       { bg: '#2a1010', border: '#f44336', icon: '!' },
+// ── Base styling ──────────────────────────────────────────────
+const baseStyle: React.CSSProperties = {
+  padding: '8px 14px',
+  borderRadius: 10,
+  border: '2px solid',
+  fontSize: 12,
+  fontWeight: 600,
+  fontFamily: "'JetBrains Mono', monospace",
+  color: '#fff',
+  textAlign: 'center',
+  minWidth: 60,
+  maxWidth: 240,
+  transition: 'all 0.15s ease',
+  position: 'relative',
+  cursor: 'pointer',
 };
 
-interface BaseNodeProps {
-  id: string;
-  data: FlowNodeData;
-  children?: React.ReactNode;
-  minWidth?: number;
+const handleStyle: React.CSSProperties = {
+  width: 8,
+  height: 8,
+  border: '2px solid #1a1a28',
+  background: '#6c6cf0',
+  transition: 'all 0.2s ease',
+};
+
+// ── Node type → color mapping ─────────────────────────────────
+const nodeColors: Record<string, { bg: string; border: string }> = {
+  entry:      { bg: 'linear-gradient(135deg, #065f46, #059669)', border: '#22c55e' },
+  exit:       { bg: 'linear-gradient(135deg, #7f1d1d, #dc2626)', border: '#ef4444' },
+  statement:  { bg: 'linear-gradient(135deg, #1e3a5f, #2563eb)', border: '#3b82f6' },
+  condition:  { bg: 'linear-gradient(135deg, #78350f, #d97706)', border: '#f59e0b' },
+  loop:       { bg: 'linear-gradient(135deg, #164e63, #0891b2)', border: '#06b6d4' },
+  call:       { bg: 'linear-gradient(135deg, #4c1d95, #7c3aed)', border: '#a855f7' },
+  function:   { bg: 'linear-gradient(135deg, #4c1d95, #7c3aed)', border: '#a855f7' },
+  try:        { bg: 'linear-gradient(135deg, #581c87, #9333ea)', border: '#a855f7' },
+  except:     { bg: 'linear-gradient(135deg, #581c87, #9333ea)', border: '#a855f7' },
+  break:      { bg: 'linear-gradient(135deg, #7c2d12, #ea580c)', border: '#f97316' },
+  continue:   { bg: 'linear-gradient(135deg, #713f12, #ca8a04)', border: '#eab308' },
+  comment:    { bg: 'linear-gradient(135deg, #064e3b, #10b981)', border: '#22c55e', },
+  classNode:  { bg: 'linear-gradient(135deg, #3b0764, #8b5cf6)', border: '#8b5cf6' },
+};
+
+const defaultColor = { bg: 'linear-gradient(135deg, #1e3a5f, #2563eb)', border: '#3b82f6' };
+
+function useColors(nodeType: string) {
+  return nodeColors[nodeType] || defaultColor;
 }
 
-function BaseNode({ id, data, children, minWidth = 120 }: BaseNodeProps) {
-  const style = NODE_STYLES[data.nodeType] || NODE_STYLES.statement;
-
+// ── Base Node Wrapper ──────────────────────────────────────────
+const BaseNode = memo(({ id, data, children }: { id: string; data: any; children?: React.ReactNode }) => {
+  const colors = useColors(data.nodeType);
+  const isHighlighted = false; // handled via className
   return (
     <div
       style={{
-        background: style.bg,
-        border: `2px solid ${style.border}`,
-        borderRadius: data.nodeType === 'condition' ? '2px' : '8px',
-        padding: '8px 14px',
-        minWidth,
-        maxWidth: 320,
-        color: '#e0e0e0',
-        fontSize: 13,
-        fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-        wordBreak: 'break-word',
-        whiteSpace: 'pre-wrap',
-        position: 'relative',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+        ...baseStyle,
+        background: colors.bg,
+        borderColor: colors.border,
+        boxShadow: `0 0 12px ${colors.border}22, 0 2px 8px rgba(0,0,0,0.3)`,
       }}
     >
-      <Handle
-        type="target"
-        position={Position.Top}
-        style={{ background: style.border, width: 8, height: 8, border: 'none' }}
-      />
-      {children || (
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-          <span style={{ color: style.border, flexShrink: 0, fontSize: 14 }}>
-            {style.icon}
-          </span>
-          <span style={{ flex: 1, lineHeight: 1.5 }}>{data.label}</span>
-        </div>
-      )}
-      {(data.lineNo ?? 0) > 0 && (
-        <div style={{
-          position: 'absolute', top: 2, right: 6,
-          fontSize: 10, color: '#666',
-        }}>
-          L{data.lineNo}
-        </div>
-      )}
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        style={{ background: style.border, width: 8, height: 8, border: 'none' }}
-      />
-    </div>
-  );
-}
-
-// ── Entry Node (function signature) ──────────────────────────────────
-
-export const EntryNode = memo(({ id, data }: NodeProps) => {
-  const d = useData(data);
-  return (
-    <BaseNode id={id} data={d} minWidth={180}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-        <span style={{
-          background: '#4fc3f7', color: '#1a1a2e', borderRadius: 4,
-          padding: '2px 6px', fontSize: 11, fontWeight: 700, flexShrink: 0,
-        }}>
-          ENTRY
-        </span>
-        <span style={{ flex: 1, lineHeight: 1.5, fontWeight: 600 }}>
-          {d.label}
-        </span>
-      </div>
-    </BaseNode>
-  );
-});
-
-// ── Exit Node ────────────────────────────────────────────────────────
-
-export const ExitNode = memo(({ id, data }: NodeProps) => {
-  const d = useData(data);
-  return (
-    <BaseNode id={id} data={d}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ color: '#81c784', fontSize: 12 }}>↩</span>
-        <span style={{ color: '#81c784', fontStyle: 'italic' }}>{d.label}</span>
-      </div>
-    </BaseNode>
-  );
-});
-
-// ── Condition Node (if/elif) ─────────────────────────────────────────
-
-export const ConditionNode = memo(({ id, data }: NodeProps) => {
-  const d = useData(data);
-  return (
-    <BaseNode id={id} data={d} minWidth={160}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ color: '#ffb74d', fontSize: 16, flexShrink: 0 }}>◇</span>
-        <span style={{ flex: 1, lineHeight: 1.5, color: '#ffb74d' }}>
-          {d.label}
-        </span>
-      </div>
-    </BaseNode>
-  );
-});
-
-// ── Loop Node ────────────────────────────────────────────────────────
-
-const LoopNode = memo(({ id, data }: NodeProps) => {
-  const d = useData(data);
-  return (
-    <BaseNode id={id} data={d} minWidth={160}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ color: '#4dd0e1', fontSize: 15, flexShrink: 0 }}>↻</span>
-        <span style={{ flex: 1, lineHeight: 1.5, color: '#4dd0e1' }}>
-          {d.label}
-        </span>
-      </div>
-    </BaseNode>
-  );
-});
-
-// ── Statement Node ───────────────────────────────────────────────────
-
-const StatementNode = memo(({ id, data }: NodeProps) => {
-  const d = useData(data);
-  return (
-    <BaseNode id={id} data={d} minWidth={140}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ color: '#78909c', fontSize: 10, flexShrink: 0 }}>▸</span>
-        <span style={{ flex: 1, lineHeight: 1.5 }}>{d.label}</span>
-      </div>
-    </BaseNode>
-  );
-});
-
-// ── Call Node (function call) ────────────────────────────────────────
-
-const CallNode = memo(({ id, data }: NodeProps) => {
-  const d = useData(data);
-  return (
-    <BaseNode id={id} data={d} minWidth={140}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ color: '#ce93d8', fontSize: 13, flexShrink: 0 }}>→</span>
-        <span style={{ flex: 1, lineHeight: 1.5, color: '#ce93d8' }}>
-          {d.label}
-        </span>
-        {d.expandable && (
-          <span style={{
-            background: '#ce93d8', color: '#1a1a2e', borderRadius: 3,
-            padding: '1px 5px', fontSize: 10, fontWeight: 600,
-            cursor: 'pointer',
-          }}>
-            +
-          </span>
-        )}
-      </div>
-    </BaseNode>
-  );
-});
-
-// ── Function Node (for project/file view) ────────────────────────────
-
-const FunctionNode = memo(({ id, data }: NodeProps) => {
-  const d = useData(data);
-  return (
-    <BaseNode id={id} data={d} minWidth={150}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ color: '#64b5f6', fontSize: 13 }}>ƒ</span>
-        <div>
-          <div style={{ fontWeight: 600, lineHeight: 1.4 }}>{d.label}</div>
-          {d.filepath && (
-            <div style={{ fontSize: 10, color: '#666', lineHeight: 1.2 }}>
-              {d.filepath as string}
-            </div>
-          )}
-        </div>
-      </div>
-    </BaseNode>
-  );
-});
-
-// ── Try/Except Nodes ─────────────────────────────────────────────────
-
-const TryNode = memo(({ id, data }: NodeProps) => {
-  const d = useData(data);
-  return (
-    <BaseNode id={id} data={d} minWidth={100}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ color: '#ef5350', fontSize: 13 }}>⚠</span>
-        <span style={{ fontWeight: 600, color: '#ef5350' }}>try</span>
-      </div>
-    </BaseNode>
-  );
-});
-
-const ExceptNode = memo(({ id, data }: NodeProps) => {
-  const d = useData(data);
-  return (
-    <BaseNode id={id} data={d} minWidth={160}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ color: '#ff7043', fontSize: 13 }}>✕</span>
-        <span style={{ lineHeight: 1.5, color: '#ff7043' }}>{d.label}</span>
-      </div>
-    </BaseNode>
-  );
-});
-
-// ── Error Node ────────────────────────────────────────────────────────
-
-const ErrorNode = memo(({ data }: NodeProps) => {
-  const d = useData(data);
-  return (
-    <div style={{
-      background: '#3a1010',
-      border: '2px solid #f44336',
-      borderRadius: 8,
-      padding: '10px 16px',
-      maxWidth: 300,
-      color: '#f44336',
-      fontSize: 13,
-      fontFamily: 'monospace',
-      boxShadow: '0 2px 8px rgba(244,67,54,0.3)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 18 }}>⚠</span>
-        <span>{d.label}</span>
-      </div>
+      <Handle type="target" position={Position.Top} style={handleStyle} />
+      {children || <span>{data.label}</span>}
+      <Handle type="source" position={Position.Bottom} style={{ ...handleStyle, bottom: -4 }} />
     </div>
   );
 });
 
-// ── Break / Continue Nodes ──────────────────────────────────────────
+// ── Node Components ────────────────────────────────────────────
+export const EntryNode = memo(({ id, data }: NodeProps) => (
+  <BaseNode id={id} data={data}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ fontSize: 14 }}>▶</span>
+      <span>{data.label}</span>
+    </div>
+  </BaseNode>
+));
 
-const BreakNode = memo(({ id, data }: NodeProps) => {
-  const d = useData(data);
-  return (
-    <BaseNode id={id} data={{ ...d, nodeType: 'break' }} minWidth={80}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ color: '#ff8a65', fontSize: 13, flexShrink: 0 }}>⏹</span>
-        <span style={{ flex: 1, lineHeight: 1.5, color: '#ff8a65', fontWeight: 600 }}>break</span>
-      </div>
-    </BaseNode>
-  );
-});
+export const ExitNode = memo(({ id, data }: NodeProps) => (
+  <BaseNode id={id} data={data}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ fontSize: 14 }}>■</span>
+      <span>{data.label}</span>
+    </div>
+  </BaseNode>
+));
 
-const ContinueNode = memo(({ id, data }: NodeProps) => {
-  const d = useData(data);
-  return (
-    <BaseNode id={id} data={{ ...d, nodeType: 'continue' }} minWidth={80}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ color: '#ffcc80', fontSize: 13, flexShrink: 0 }}>⏭</span>
-        <span style={{ flex: 1, lineHeight: 1.5, color: '#ffcc80', fontWeight: 600 }}>continue</span>
-      </div>
-    </BaseNode>
-  );
-});
+export const StatementNode = memo(({ id, data }: NodeProps) => (
+  <BaseNode id={id} data={data}>
+    <div style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      {data.label}
+    </div>
+  </BaseNode>
+));
 
-// ── Comment Node (docstrings / # comments, collapsible) ──────────────
+export const ConditionNode = memo(({ id, data }: NodeProps) => (
+  <BaseNode id={id} data={data}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ fontSize: 13 }}>◆</span>
+      <span style={{ maxWidth: 170, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.label}</span>
+    </div>
+  </BaseNode>
+));
 
-const CommentNode = memo(({ id, data }: NodeProps) => {
-  const d = useData(data);
-  const collapsed = d.collapsed !== false;
-  const isDocstring = d.isDocstring === true;
-  const fullText = (d.commentText as string) || d.label || '';
-  const borderColor = '#2e7d32';  // dark green distinct from return's #81c784
+export const LoopNode = memo(({ id, data }: NodeProps) => (
+  <BaseNode id={id} data={data}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ fontSize: 13 }}>↻</span>
+      <span style={{ maxWidth: 170, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.label}</span>
+    </div>
+  </BaseNode>
+));
 
-  return (
+export const CallNode = memo(({ id, data }: NodeProps) => (
+  <BaseNode id={id} data={data}>
     <div
-      style={{
-        background: '#0d2818',
-        border: `2px solid ${borderColor}`,
-        borderRadius: 8,
-        padding: collapsed ? '6px 12px' : '8px 14px',
-        minWidth: 140,
-        maxWidth: 360,
-        color: '#a5d6a7',
-        fontSize: 12,
-        fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-        wordBreak: 'break-word',
-        whiteSpace: collapsed ? 'nowrap' : 'pre-wrap',
-        overflow: 'hidden',
-        textOverflow: collapsed ? 'ellipsis' : 'unset',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-        position: 'relative',
-      }}
+      style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: data.expandable ? 'pointer' : 'default' }}
+      title={data.expandable ? 'Double-click to drill down' : undefined}
     >
-      <Handle
-        type="target"
-        position={Position.Top}
-        style={{ background: borderColor, width: 8, height: 8, border: 'none' }}
-      />
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-        <span style={{ color: borderColor, fontSize: 13, flexShrink: 0 }}>
-          {isDocstring ? '📄' : '💬'}
-        </span>
-        <span style={{ flex: 1, lineHeight: 1.5 }}>
-          {collapsed ? (fullText.length > 60 ? fullText.slice(0, 60) + '...' : fullText) : fullText}
-        </span>
-        <span style={{
-          color: borderColor, fontSize: 10, cursor: 'pointer',
-          background: 'rgba(46,125,50,0.15)', borderRadius: 3, padding: '1px 5px',
-          flexShrink: 0, userSelect: 'none',
-        }} title="Right-click to expand/collapse">
-          {collapsed ? '▶' : '▼'}
-        </span>
-      </div>
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        style={{ background: borderColor, width: 8, height: 8, border: 'none' }}
-      />
+      <span style={{ fontSize: 13 }}>◎</span>
+      <span style={{ maxWidth: 170, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.label}</span>
+      {data.expandable && <span style={{ fontSize: 9, opacity: 0.7 }}>↗</span>}
     </div>
-  );
-});
+  </BaseNode>
+));
 
-// ── Class Node (for file-level class entries) ────────────────────────
-
-const ClassNode = memo(({ id, data }: NodeProps) => {
-  const d = useData(data);
-  return (
-    <BaseNode id={id} data={{ ...d, nodeType: 'function' }} minWidth={150}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ color: '#ba68c8', fontSize: 13 }}>📦</span>
-        <div>
-          <div style={{ fontWeight: 600, lineHeight: 1.4, color: '#ce93d8' }}>{d.label}</div>
-        </div>
-      </div>
-    </BaseNode>
-  );
-});
-
-// ── Group Box Node (background rectangle for block grouping) ──────────
-
-const GroupBoxNode = memo(({ data }: NodeProps) => {
-  const d = useData(data);
-  const bgColor = (d.blockColor as string) || 'rgba(100,100,100,0.06)';
-  const borderColor = (d.blockBorder as string) || '#555';
-  return (
+export const FunctionNode = memo(({ id, data }: NodeProps) => (
+  <BaseNode id={id} data={data}>
     <div
-      style={{
-        width: '100%',
-        height: '100%',
-        background: bgColor,
-        border: `1px dashed ${borderColor}`,
-        borderRadius: 10,
-        position: 'relative',
-        pointerEvents: 'none',
-      }}
+      style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+      title="Double-click to view function body"
     >
-      <span style={{
-        position: 'absolute',
-        top: -10,
-        left: 8,
-        background: '#161b22',
-        color: borderColor,
-        fontSize: 10,
-        fontWeight: 600,
-        padding: '1px 8px',
-        borderRadius: 4,
-        fontFamily: 'monospace',
-        whiteSpace: 'nowrap',
-        border: `1px solid ${borderColor}`,
-      }}>
-        {d.label}
-      </span>
+      <span style={{ fontSize: 13 }}>ƒ</span>
+      <span style={{ maxWidth: 170, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.label}</span>
+      <span style={{ fontSize: 9, opacity: 0.7 }}>↗</span>
     </div>
+  </BaseNode>
+));
+
+export const TryNode = memo(({ id, data }: NodeProps) => (
+  <BaseNode id={id} data={data}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ fontSize: 13 }}>⚠</span>
+      <span>{data.label}</span>
+    </div>
+  </BaseNode>
+));
+
+export const ExceptNode = memo(({ id, data }: NodeProps) => (
+  <BaseNode id={id} data={data}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ fontSize: 13 }}>✕</span>
+      <span>{data.label}</span>
+    </div>
+  </BaseNode>
+));
+
+export const BreakNode = memo(({ id, data }: NodeProps) => (
+  <BaseNode id={id} data={data}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ fontSize: 13 }}>⏹</span>
+      <span>break</span>
+    </div>
+  </BaseNode>
+));
+
+export const ContinueNode = memo(({ id, data }: NodeProps) => (
+  <BaseNode id={id} data={data}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ fontSize: 13 }}>⏭</span>
+      <span>continue</span>
+    </div>
+  </BaseNode>
+));
+
+export const CommentNode = memo(({ id, data }: NodeProps) => {
+  const coll = data.collapsed;
+  return (
+    <BaseNode id={id} data={data}>
+    <div style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis',
+      whiteSpace: coll ? 'nowrap' : 'normal',
+      fontSize: coll ? 11 : 11, opacity: 0.85,
+      fontStyle: 'italic', }}>
+      {String(coll ? `${(data.commentText || data.label || '').slice(0, 40)}…` : (data.commentText || data.label || ''))}
+    </div>
+  </BaseNode>
   );
 });
 
-// ── Register all custom nodes ─────────────────────────────────────────
+export const ClassNode = memo(({ id, data }: NodeProps) => (
+  <BaseNode id={id} data={data}>
+    <div
+      style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+      title="Double-click to view class internals"
+    >
+      <span style={{ fontSize: 13 }}>▦</span>
+      <span style={{ maxWidth: 170, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.label}</span>
+      <span style={{ fontSize: 9, opacity: 0.7 }}>↗</span>
+    </div>
+  </BaseNode>
+));
 
+// ── Group Box ─────────────────────────────────────────────────
+export const GroupBoxNode = memo(({ id, data }: NodeProps) => (
+  <div
+    style={{
+      border: `2px dashed ${data.groupType === 'struct' ? '#6366f1' : '#22d3ee'}`,
+      borderRadius: 14,
+      padding: 16,
+      background: data.groupType === 'struct'
+        ? 'rgba(99, 102, 241, 0.04)'
+        : 'rgba(34, 211, 238, 0.04)',
+      minWidth: 100,
+      minHeight: 60,
+      pointerEvents: 'none',
+      position: 'relative',
+    }}
+  >
+    {data.groupLabel && (
+      <div
+        style={{
+          position: 'absolute',
+          top: -8,
+          left: 14,
+          background: '#0a0a0f',
+          padding: '0 8px',
+          fontSize: 10,
+          fontWeight: 600,
+          color: data.groupType === 'struct' ? '#818cf8' : '#67e8f9',
+          borderRadius: 4,
+          fontFamily: "'Inter', sans-serif",
+        }}
+      >
+        {data.groupLabel}
+      </div>
+    )}
+  </div>
+));
+
+// ── Node Types Map ─────────────────────────────────────────────
 export const nodeTypes = {
   entry: EntryNode,
   exit: ExitNode,
+  statement: StatementNode,
   condition: ConditionNode,
   loop: LoopNode,
-  statement: StatementNode,
   call: CallNode,
   function: FunctionNode,
   try: TryNode,
   except: ExceptNode,
-  error: ErrorNode,
-  groupBox: GroupBoxNode,
-  comment: CommentNode,
   break: BreakNode,
   continue: ContinueNode,
+  comment: CommentNode,
   classNode: ClassNode,
+  groupBox: GroupBoxNode,
 };

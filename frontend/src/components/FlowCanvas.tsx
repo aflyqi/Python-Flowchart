@@ -1,41 +1,36 @@
-import React, { useCallback, useMemo, useEffect, useRef } from 'react';
+import React, { useMemo, useEffect, useRef, useCallback, useState } from 'react';
 import {
   ReactFlow,
-  Background,
-  Controls,
-  MiniMap,
   useNodesState,
   useEdgesState,
   useReactFlow,
+  Background,
+  BackgroundVariant,
+  Controls,
+  MiniMap,
   type Node,
   type Edge,
-  BackgroundVariant,
-  MarkerType,
 } from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
+import type { FlowNode, FlowEdge, FlowBlock, FlowNodeData } from '../types';
 import { nodeTypes } from './CustomNodes';
-import type { FlowNode, FlowEdge, FlowNodeData, FlowBlock } from '../types';
 
+// ── Props ─────────────────────────────────────────────────────
 interface FlowCanvasProps {
   nodes: FlowNode[];
   edges: FlowEdge[];
   blocks?: FlowBlock[];
-  /** Single-click: for sync (jump to code line) */
-  onNodeClick?: (nodeId: string, nodeData: FlowNodeData) => void;
-  /** Double-click: for drill-down (enter function/class) */
-  onNodeDoubleClick?: (nodeId: string, nodeData: FlowNodeData) => void;
-  /** When set, this node will be highlighted and centered */
+  onNodeClick?: (nodeId: string, data: FlowNodeData) => void;
+  onNodeDoubleClick?: (nodeId: string, data: FlowNodeData) => void;
   highlightedNodeId?: string | null;
-  /** Show/hide the minimap */
   showMinimap?: boolean;
-  /** Enable/disable animated loop edges (dashed animation) */
   animatedEdges?: boolean;
 }
 
-// ── Dagre layout ──────────────────────────────────────────────────────
-
-const NODE_WIDTH = 200;
-const NODE_HEIGHT = 60;
+// ── Dagre Layout ──────────────────────────────────────────────
+const NODE_WIDTH = 180;
+const NODE_HEIGHT = 56;
 
 function layoutGraph(
   nodes: FlowNode[],
@@ -44,22 +39,18 @@ function layoutGraph(
 ): { nodes: FlowNode[]; edges: FlowEdge[] } {
   const g = new dagre.graphlib.Graph({ compound: true });
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: 'TB', nodesep: 60, ranksep: 80, marginx: 40, marginy: 40 });
+  g.setGraph({ rankdir: 'TB', nodesep: 50, ranksep: 70, marginx: 30, marginy: 30 });
 
-  // Add regular nodes
   for (const node of nodes) {
-    const w = Math.max(NODE_WIDTH, node.data.label.length * 8 + 80);
+    const w = Math.max(NODE_WIDTH, (node.data.label?.length || 0) * 7.5 + 60);
     g.setNode(node.id, { width: w, height: NODE_HEIGHT });
   }
 
-  // Add block group nodes + set parent-child relationships (dagre compound)
   if (blocks) {
     for (const block of blocks) {
-      g.setNode(block.id, { width: 100, height: 60, padding: 30 });
-      for (const nodeId of block.nodeIds) {
-        if (g.hasNode(nodeId)) {
-          g.setParent(nodeId, block.id);
-        }
+      g.setNode(block.id, { width: 100, height: 60, padding: 25 });
+      for (const nid of block.nodeIds) {
+        if (g.hasNode(nid)) g.setParent(nid, block.id);
       }
     }
   }
@@ -70,7 +61,7 @@ function layoutGraph(
 
   dagre.layout(g);
 
-  const laidOutNodes = nodes.map(node => {
+  const laidOut = nodes.map(node => {
     const pos = g.node(node.id);
     return {
       ...node,
@@ -81,60 +72,22 @@ function layoutGraph(
     };
   });
 
-  return { nodes: laidOutNodes, edges };
+  return { nodes: laidOut, edges };
 }
 
-// ── Group box creation ─────────────────────────────────────────────────
-
-function createGroupNodes(laidOutNodes: FlowNode[], blocks: FlowBlock[]): FlowNode[] {
-  const nodeMap = new Map<string, FlowNode>();
-  for (const n of laidOutNodes) {
-    nodeMap.set(n.id, n);
+// ── Edge Coloring ─────────────────────────────────────────────
+function edgeColor(type?: string) {
+  switch (type) {
+    case 'true': return '#22c55e';
+    case 'false': return '#ef4444';
+    case 'exception': return '#f59e0b';
+    case 'loop': return '#06b6d4';
+    case 'call': return '#a855f7';
+    default: return '#484858';
   }
-
-  const groupNodes: FlowNode[] = [];
-  for (const block of blocks) {
-    const members = block.nodeIds.map(id => nodeMap.get(id)).filter(Boolean) as FlowNode[];
-    if (members.length < 2) continue;
-
-    // Calculate bounding box
-    const PADDING = 20;
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const m of members) {
-      const w = Math.max(NODE_WIDTH, m.data.label.length * 8 + 80);
-      minX = Math.min(minX, m.position.x);
-      minY = Math.min(minY, m.position.y);
-      maxX = Math.max(maxX, m.position.x + w);
-      maxY = Math.max(maxY, m.position.y + NODE_HEIGHT);
-    }
-
-    const groupNode: FlowNode = {
-      id: block.id,
-      type: 'groupBox',
-      data: {
-        label: block.label,
-        nodeType: 'groupBox',
-        lineNo: 0,
-        // Store block style info
-        blockType: block.type,
-        blockColor: block.color,
-        blockBorder: block.border,
-      },
-      position: { x: minX - PADDING, y: minY - PADDING },
-      style: {
-        width: maxX - minX + PADDING * 2,
-        height: maxY - minY + PADDING * 2,
-        zIndex: -1,
-      },
-    };
-    groupNodes.push(groupNode);
-  }
-
-  return groupNodes;
 }
 
-// ── Component ─────────────────────────────────────────────────────────
-
+// ── Component ─────────────────────────────────────────────────
 const FlowCanvas: React.FC<FlowCanvasProps> = ({
   nodes: rawNodes,
   edges: rawEdges,
@@ -147,392 +100,270 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
 }) => {
   const { fitView, getZoom, setCenter } = useReactFlow();
   const prevHighlighted = useRef<string | null | undefined>(null);
+  const initialFitDone = useRef(false);
 
-  const [isolatedBlockId, setIsolatedBlockId] = React.useState<string | null>(null);
+  const [isolatedBlockId, setIsolatedBlockId] = useState<string | null>(null);
 
-  // Derive effective nodes/edges: filtered when isolated, full otherwise.
-  // Filtering at this level ensures dagre layout runs on every change.
+  // ── Filter nodes for block isolation view ────────────────
   const effectiveNodes = useMemo(() => {
     if (!isolatedBlockId) return rawNodes;
-    // Find all member node IDs for this block (including nested blocks)
-    const memberIds = new Set<string>();
-    for (const n of rawNodes) {
-      const d = n.data as unknown as FlowNodeData;
-      const bid = d.blockId || '';
-      // Match this block OR any nested block (hierarchical prefix)
-      if (bid === isolatedBlockId || bid.startsWith(isolatedBlockId + '_')) {
-        memberIds.add(n.id);
-      }
-    }
-    // Also include header nodes (all edge sources pointing into this block)
-    for (const e of rawEdges) {
-      const target = rawNodes.find(n => n.id === e.target);
-      const td = target?.data as unknown as FlowNodeData;
-      const tbid = td?.blockId || '';
-      if (tbid === isolatedBlockId || tbid.startsWith(isolatedBlockId + '_')) {
-        memberIds.add(e.source);
-      }
-    }
-    return rawNodes.filter(n => memberIds.has(n.id));
-  }, [rawNodes, rawEdges, isolatedBlockId]);
-
+    return rawNodes.filter(n => {
+      const bid = n.data.blockId || '';
+      return bid === isolatedBlockId || bid.startsWith(isolatedBlockId + '_') || bid.startsWith(isolatedBlockId + '-');
+    });
+  }, [rawNodes, isolatedBlockId]);
   const effectiveEdges = useMemo(() => {
     if (!isolatedBlockId) return rawEdges;
-    const memberIds = new Set(effectiveNodes.map(n => n.id));
-    return rawEdges.filter(e => memberIds.has(e.source) && memberIds.has(e.target));
-  }, [rawEdges, isolatedBlockId, effectiveNodes]);
+    const validIds = new Set(effectiveNodes.map(n => n.id));
+    return rawEdges.filter(e => validIds.has(e.source) && validIds.has(e.target));
+  }, [rawEdges, effectiveNodes]);
 
-  // Apply dagre layout
+  // ── Dagre layout ──────────────────────────────────────────
   const { nodes: laidOutNodes, edges: laidOutEdges } = useMemo(
     () => layoutGraph(effectiveNodes, effectiveEdges, blocks),
     [effectiveNodes, effectiveEdges, blocks]
   );
 
-  // Create group nodes from blocks
-  const groupNodes = useMemo(
-    () => blocks && blocks.length > 0 ? createGroupNodes(laidOutNodes, blocks) : [],
-    [laidOutNodes, blocks]
-  );
-
-  // Combine content nodes with group nodes
-  const allNodes = useMemo(
-    () => [...laidOutNodes, ...groupNodes],
-    [laidOutNodes, groupNodes]
-  );
-
-  // Add styling to edges
-  const styledEdges = useMemo(() => {
-    return laidOutEdges.map(edge => ({
-      ...edge,
-      animated: animatedEdges && (edge.type === 'loop' || edge.animated),
+  // ── Style edges ──────────────────────────────────────────
+  const styledEdges = useMemo(() =>
+    laidOutEdges.map(e => ({
+      ...e,
+      animated: animatedEdges && (e.type === 'loop' || e.animated),
       style: {
-        stroke: edge.type === 'true'
-          ? '#4caf50'
-          : edge.type === 'false'
-          ? '#f44336'
-          : edge.type === 'exception'
-          ? '#ff9800'
-          : edge.type === 'loop'
-          ? '#4dd0e1'
-          : edge.type === 'call'
-          ? '#ce93d8'
-          : '#546e7a',
-        strokeWidth: edge.type === 'true' || edge.type === 'false' ? 2 : 1.5,
+        stroke: e.type === 'loop' ? '#06b6d4' : edgeColor(e.type),
+        strokeWidth: e.type === 'loop' ? 2 : e.type ? 2.5 : 1.5,
+        strokeDasharray: e.type === 'loop' ? '6 3' : undefined,
       },
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        color: edge.type === 'true'
-          ? '#4caf50'
-          : edge.type === 'false'
-          ? '#f44336'
-          : edge.type === 'exception'
-          ? '#ff9800'
-          : edge.type === 'loop'
-          ? '#4dd0e1'
-          : '#546e7a',
-        width: 16,
-        height: 16,
-      },
-      labelStyle: {
-        fill: edge.type === 'true' ? '#4caf50' : edge.type === 'false' ? '#f44336' : '#aaa',
-        fontWeight: 600,
-        fontSize: 11,
-        fontFamily: 'monospace',
-      },
-      labelBgStyle: {
-        fill: '#1a1a2e',
-        fillOpacity: 0.9,
-        rx: 3,
-      },
-      labelBgPadding: [4, 2] as [number, number],
-      labelBgBorderRadius: 3,
-    }));
-  }, [laidOutEdges]);
+      labelStyle: { fill: '#686880', fontSize: 10 },
+    })),
+    [laidOutEdges, animatedEdges]
+  );
 
-  // Apply "selected" className to the highlighted node
-  const styledNodes = useMemo(() => {
-    return allNodes.map(node => ({
-      ...node,
-      className: highlightedNodeId && node.id === highlightedNodeId ? 'flow-node-highlighted' : '',
-    }));
-  }, [allNodes, highlightedNodeId]);
+  // ── Style nodes with highlight ───────────────────────────
+  const styledNodes = useMemo(() =>
+    laidOutNodes.map(n => ({
+      ...n,
+      className: highlightedNodeId && n.id === highlightedNodeId ? 'flow-node-highlighted' : '',
+    })),
+    [laidOutNodes, highlightedNodeId]
+  );
 
   const [nodesState, setNodes, onNodesChange] = useNodesState(styledNodes as unknown as Node[]);
   const [edgesState, setEdges, onEdgesChange] = useEdgesState(styledEdges as unknown as Edge[]);
 
-  // Center on a node without changing zoom (pan only)
-  const centerOnNode = useCallback((nodeId: string) => {
-    const node = (nodesState as unknown as FlowNode[]).find(n => n.id === nodeId);
-    if (!node) return;
-    const zoom = getZoom();
-    // Use setCenter for reliable panning (fitView with locked zoom can be unreliable)
-    setCenter(node.position.x + 100, node.position.y + 30, { zoom, duration: 300 });
-  }, [nodesState, setCenter, getZoom]);
-
-  // Update when props change — fitView only on very first load
-  const initialFitDone = useRef(false);
+  // ── Sync props → state, fitView once ─────────────────────
   useEffect(() => {
     const hasNodes = styledNodes.length > 0;
     setNodes(styledNodes as unknown as Node[]);
     setEdges(styledEdges as unknown as Edge[]);
     if (hasNodes && !initialFitDone.current) {
       initialFitDone.current = true;
-      setTimeout(() => fitView({ padding: 0.3, duration: 300 }), 100);
+      setTimeout(() => fitView({ padding: 0.3, duration: 300 }), 50);
     }
   }, [styledNodes, styledEdges, setNodes, setEdges, fitView]);
 
-  // Center on highlighted node when it changes (sync: code → flow)
+  // ── Center on highlighted node ───────────────────────────
   useEffect(() => {
     if (!highlightedNodeId || highlightedNodeId === prevHighlighted.current) return;
     prevHighlighted.current = highlightedNodeId;
-
-    // Use rAF to let React Flow finish layout before centering
     const raf = requestAnimationFrame(() => {
       const target = (nodesState as unknown as FlowNode[]).find(n => n.id === highlightedNodeId);
-      if (!target) return;
-
-      centerOnNode(highlightedNodeId);
+      if (!target || !target.position) return;
+      const zoom = getZoom();
+      setCenter(target.position.x + 90, target.position.y + 28, { zoom, duration: 250 });
     });
     return () => cancelAnimationFrame(raf);
-  }, [highlightedNodeId, nodesState, centerOnNode]);
+  }, [highlightedNodeId, nodesState, setCenter, getZoom]);
 
-  // When entering isolation, center on the structural header (for/while/try/etc.)
-  useEffect(() => {
-    if (!isolatedBlockId) return;
-    const timer = setTimeout(() => {
-      const headerNode = effectiveNodes.find(n => {
-        const d = n.data as unknown as FlowNodeData;
-        return ['loop', 'condition', 'try', 'except', 'entry', 'with'].includes(d.nodeType);
-      });
-      if (headerNode) {
-        centerOnNode(headerNode.id);
-      }
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [isolatedBlockId, effectiveNodes, centerOnNode]);
-
-  // Single-click: sync only (jump to code line in parent)
+  // ── Click handlers ───────────────────────────────────────
   const handleNodeClick = useCallback(
-    (_event: React.MouseEvent, node: Node) => {
-      if (onNodeClick) {
-        const data = node.data as unknown as FlowNodeData;
-        if (data.nodeType !== 'groupBox') {
-          onNodeClick(node.id, data);
-        }
-      }
-    },
+    (_e: React.MouseEvent, node: Node) => onNodeClick?.(node.id, node.data as unknown as FlowNodeData),
     [onNodeClick]
   );
 
-  // Double-click: drill-down (enter function/class/call)
   const handleNodeDoubleClick = useCallback(
-    (_event: React.MouseEvent, node: Node) => {
-      if (onNodeDoubleClick) {
-        const data = node.data as unknown as FlowNodeData;
-        if (data.nodeType !== 'groupBox') {
-          onNodeDoubleClick(node.id, data);
-        }
-      }
-    },
+    (_e: React.MouseEvent, node: Node) => onNodeDoubleClick?.(node.id, node.data as unknown as FlowNodeData),
     [onNodeDoubleClick]
   );
 
-  // Right-click context menu
-  type ContextMenuState = {
-    x: number; y: number;
-    kind: 'comment' | 'block' | 'functionView' | 'findDef' | 'pane' | 'inspect';
-    nodeId: string;
-    // comment-specific
-    collapsed?: boolean;
-    // block-specific
-    blockIds?: string[];
-    blockTypes?: string[];
-    // functionView-specific
-    callName?: string;
-    // inspect-specific
-    inspectData?: Record<string, unknown>;
-  } | null;
+  // ── Context Menu ─────────────────────────────────────────
+  const [contextMenu, setContextMenu] = useState<{
+    x: number; y: number; kind: string; nodeId?: string;
+    inspectData?: Record<string, unknown>; blockIds?: string[];
+    collapsed?: boolean; callName?: string; funcName?: string;
+  } | null>(null);
+  const [inspectPopup, setInspectPopup] = useState<{ data: any } | null>(null);
 
-  const menuItemStyle: React.CSSProperties = {
-    padding: '8px 14px', fontSize: 12, color: '#c9d1d9',
-    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-  };
+  const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
+    const data = node.data as unknown as FlowNodeData;
+    if (data.isGroupBox) return;
 
-  const [contextMenu, setContextMenu] = React.useState<ContextMenuState>(null);
-  const [inspectPopup, setInspectPopup] = React.useState<{ data: Record<string, unknown> } | null>(null);
-
-  // Build mapping: parentNodeId → [{blockId, blockType}]
-  const blockParents = useMemo(() => {
-    const map = new Map<string, { blockId: string; blockType: string }[]>();
-    for (const edge of rawEdges) {
-      const target = rawNodes.find(n => n.id === edge.target);
-      if (target?.data?.blockId) {
-        const source = rawNodes.find(n => n.id === edge.source);
-        if (source && ['loop', 'condition', 'try', 'except', 'statement'].includes(source.data.nodeType)) {
-          const entry = { blockId: target.data.blockId, blockType: target.data.blockType || 'block' };
-          const existing = map.get(edge.source) || [];
-          if (!existing.some(e => e.blockId === entry.blockId)) {
-            existing.push(entry);
-          }
-          map.set(edge.source, existing);
-        }
-      }
-    }
-    return map;
-  }, [rawNodes, rawEdges]);
-
-  const handleNodeContextMenu = useCallback(
-    (event: React.MouseEvent, node: Node) => {
-      const data = node.data as unknown as FlowNodeData;
-
-      // Comment nodes: expand/collapse
-      if (data.nodeType === 'comment') {
-        event.preventDefault();
-        setContextMenu({
-          x: event.clientX, y: event.clientY, kind: 'comment',
-          nodeId: node.id, collapsed: data.collapsed !== false,
-        });
-        return;
-      }
-
-      // Structural nodes with child blocks: view block
-      const blocks = blockParents.get(node.id);
-      if (blocks && blocks.length > 0) {
-        event.preventDefault();
-        setContextMenu({
-          x: event.clientX, y: event.clientY, kind: 'block',
-          nodeId: node.id,
-          blockIds: blocks.map(b => b.blockId),
-          blockTypes: blocks.map(b => b.blockType),
-        });
-        return;
-      }
-
-      // Expandable function nodes (e.g. class methods): view in isolation
-      if (data.expandable && (data.callName || data.funcName) && !data.isClass) {
-        event.preventDefault();
-        setContextMenu({
-          x: event.clientX, y: event.clientY, kind: 'functionView',
-          nodeId: node.id,
-          callName: data.callName || data.funcName,
-        });
-        return;
-      }
-
-      // Any non-entry node: offer "Find definition"
-      if (data.nodeType !== 'entry' && data.nodeType !== 'groupBox') {
-        // If node has inspect data, show inspect menu
-        const insp = data.inspect as Record<string, unknown> | undefined;
-        if (insp) {
-          event.preventDefault();
-          setContextMenu({
-            x: event.clientX, y: event.clientY, kind: 'inspect',
-            nodeId: node.id, inspectData: insp,
-          });
-          return;
-        }
-        event.preventDefault();
-        setContextMenu({
-          x: event.clientX, y: event.clientY, kind: 'findDef',
-          nodeId: node.id,
-        });
-      }
-    },
-    [blockParents]
-  );
-
-  // Right-click on pane (background) → "Go to start"
-  const handlePaneContextMenu = useCallback(
-    (event: React.MouseEvent | MouseEvent) => {
+    if (data.nodeType === 'comment') {
       event.preventDefault();
-      const pos = 'clientX' in event ? { x: event.clientX, y: event.clientY } : { x: 0, y: 0 };
-      setContextMenu({
-        x: pos.x, y: pos.y, kind: 'pane',
-        nodeId: '',
-      });
-    },
-    []
-  );
+      setContextMenu({ x: event.clientX, y: event.clientY, kind: 'comment', nodeId: node.id, collapsed: data.collapsed });
+      return;
+    }
 
-  const handleContextMenuAction = useCallback((action: string, blockId?: string) => {
-    if (!contextMenu) return;
-    setContextMenu(null);
+    // Expandable function/method nodes → "View function" option
+    if (data.expandable && (data.callName || data.funcName) && !data.isClass) {
+      event.preventDefault();
+      setContextMenu({ x: event.clientX, y: event.clientY, kind: 'functionView', nodeId: node.id, callName: data.callName || data.funcName });
+      return;
+    }
 
-    if (contextMenu.kind === 'comment') {
-      const expand = action === 'expand';
-      setNodes(nds =>
-        (nds as unknown as FlowNode[]).map(n => {
-          if (n.id === contextMenu.nodeId) {
-            return { ...n, data: { ...n.data, collapsed: !expand } };
-          }
-          return n;
-        }) as unknown as Node[]
-      );
-    } else if (contextMenu.kind === 'block' && blockId) {
-      // Enter isolated block view — the useMemo above filters automatically
-      setIsolatedBlockId(blockId);
-    } else if (contextMenu.kind === 'functionView') {
-      if (onNodeDoubleClick && contextMenu.callName) {
-        const nodeData: FlowNodeData = {
-          label: '', nodeType: 'function', expandable: true,
-          callName: contextMenu.callName,
-        };
-        onNodeDoubleClick(contextMenu.nodeId, nodeData);
+    // Class nodes → "View class" option
+    if (data.isClass && data.funcName) {
+      event.preventDefault();
+      setContextMenu({ x: event.clientX, y: event.clientY, kind: 'functionView', nodeId: node.id, callName: data.funcName, funcName: data.funcName });
+      return;
+    }
+
+    // Function call nodes → "View definition" (drill-down to the function definition)
+    if (data.callName && !data.isClass) {
+      event.preventDefault();
+      setContextMenu({ x: event.clientX, y: event.clientY, kind: 'callDef', nodeId: node.id, callName: data.callName });
+      return;
+    }
+
+    // Block context: nodes inside structural blocks → "View block"
+    if (data.blockId && data.nodeType !== 'entry' && data.nodeType !== 'groupBox') {
+      const blockList = blocks
+        ? blocks.filter(b => b.nodeIds.includes(node.id) && b.type !== 'comment' && b.type !== 'chunk')
+        : [];
+      if (blockList.length > 0) {
+        event.preventDefault();
+        setContextMenu({ x: event.clientX, y: event.clientY, kind: 'block', nodeId: node.id, blockIds: blockList.map(b => b.id) });
+        return;
       }
-    } else if (contextMenu.kind === 'findDef') {
-      // Find the nearest structural parent by traversing block hierarchy
-      const targetNode = (nodesState as unknown as FlowNode[]).find(n => n.id === contextMenu.nodeId);
-      if (targetNode) {
-        const d = targetNode.data as unknown as FlowNodeData;
-        const bid = d.blockId;
-        if (bid) {
-          // Walk up: block_0_1 → block_0
-          const parts = bid.split('_');
-          while (parts.length > 1) {
-            parts.pop();
-            const parentBid = parts.join('_');
-            const header = (nodesState as unknown as FlowNode[]).find(n => {
-              const nd = n.data as unknown as FlowNodeData;
-              return ['loop', 'condition', 'try', 'except', 'entry', 'with'].includes(nd.nodeType)
-                && rawEdges.some(e => {
-                  const t = rawNodes.find(rn => rn.id === e.target);
-                  const td = t?.data as unknown as FlowNodeData;
-                  return e.source === n.id && td?.blockId === parentBid;
-                });
-            });
-            if (header) {
-              centerOnNode(header.id);
-              break;
-            }
+      // Any node with a blockId can show its containing block
+      event.preventDefault();
+      setContextMenu({ x: event.clientX, y: event.clientY, kind: 'block', nodeId: node.id, blockIds: [data.blockId] });
+      return;
+    }
+
+    // Inspect data
+    if (data.inspect) {
+      event.preventDefault();
+      setContextMenu({ x: event.clientX, y: event.clientY, kind: 'inspect', nodeId: node.id, inspectData: data.inspect as Record<string, unknown> });
+      return;
+    }
+
+    // Default: Find definition
+    if (data.nodeType !== 'entry' && data.nodeType !== 'groupBox') {
+      event.preventDefault();
+      setContextMenu({ x: event.clientX, y: event.clientY, kind: 'findDef', nodeId: node.id });
+    }
+  }, [blocks]);
+
+  const clearMenu = () => setContextMenu(null);
+
+  const handleContextAction = useCallback((action: string, blockId?: string) => {
+    if (!contextMenu) return;
+
+    if (action === 'findDef') {
+      const node = (nodesState as unknown as FlowNode[]).find(n => n.id === contextMenu.nodeId);
+      if (!node) { clearMenu(); return; }
+      const bid = node.data.blockId;
+      // Walk up blockId hierarchy to find the parent structural header
+      if (bid) {
+        const parts = bid.split('_');
+        while (parts.length > 0) {
+          parts.pop();
+          const parentBid = parts.join('_');
+          if (!parentBid || parts.length === 0) break;
+          const hdr = rawEdges.find(e => {
+            const t = rawNodes.find(nd => nd.id === e.target);
+            return t?.data?.blockId === parentBid;
+          });
+          if (hdr) {
+            const zoom = getZoom();
+            const tgt = (nodesState as unknown as FlowNode[]).find(nd => nd.id === hdr.source);
+            if (tgt && tgt.position) setCenter(tgt.position.x + 90, tgt.position.y + 28, { zoom, duration: 250 });
+            break;
           }
         }
       }
-    } else if (contextMenu.kind === 'pane') {
-      // Go to start: find entry node and center
-      const entryNode = (nodesState as unknown as FlowNode[]).find(n => {
-        const d = n.data as unknown as FlowNodeData;
-        return d.nodeType === 'entry';
-      });
-      if (entryNode) {
-        centerOnNode(entryNode.id);
-      }
+      clearMenu();
+      return;
     }
-  }, [contextMenu, setNodes, rawNodes, rawEdges, onNodeDoubleClick, centerOnNode, nodesState]);
 
-  const handleExitIsolation = useCallback(() => {
-    setIsolatedBlockId(null);
+    if (action === 'viewBlock' && blockId) {
+      setIsolatedBlockId(blockId);
+      clearMenu();
+      return;
+    }
+
+    if (action === 'exitIsolation') {
+      setIsolatedBlockId(null);
+      clearMenu();
+      return;
+    }
+
+    if (action === 'functionView' && contextMenu.callName && onNodeDoubleClick) {
+      onNodeDoubleClick(contextMenu.nodeId || '', {
+        label: '', nodeType: 'function', expandable: true,
+        callName: contextMenu.callName,
+        funcName: contextMenu.funcName || contextMenu.callName,
+      });
+      clearMenu();
+      return;
+    }
+
+    // Toggle comment collapse/expand
+    if (action === 'toggleComment') {
+      setNodes(prev => prev.map(n => {
+        if (n.id === contextMenu.nodeId) {
+          const d = { ...n.data as any, collapsed: !contextMenu.collapsed };
+          return { ...n, data: d };
+        }
+        return n;
+      }));
+      clearMenu();
+      return;
+    }
+
+    // View function definition (call node → navigate to function body)
+    if (action === 'callDef' && contextMenu.callName && onNodeDoubleClick) {
+      onNodeDoubleClick(contextMenu.nodeId || '', {
+        label: '', nodeType: 'function', expandable: true, callName: contextMenu.callName,
+        funcName: contextMenu.funcName || contextMenu.callName,
+      });
+      clearMenu();
+      return;
+    }
+
+    clearMenu();
+  }, [contextMenu, nodesState, rawEdges, rawNodes, setCenter, getZoom, onNodeDoubleClick, setNodes]);
+
+  // Fit view when isolation changes
+  useEffect(() => {
+    if (isolatedBlockId) {
+      const timer = setTimeout(() => fitView({ padding: 0.3, duration: 300 }), 80);
+      return () => clearTimeout(timer);
+    }
+  }, [isolatedBlockId, fitView]);
+
+  const paneContextMenu = useCallback((event: React.MouseEvent | MouseEvent) => {
+    event.preventDefault();
+    const pos = 'clientX' in event ? { x: event.clientX, y: event.clientY } : { x: 0, y: 0 };
+    setContextMenu({ x: pos.x, y: pos.y, kind: 'pane' });
   }, []);
 
-  // Close context menu on click elsewhere
-  React.useEffect(() => {
-    if (!contextMenu) return;
-    const close = () => setContextMenu(null);
-    window.addEventListener('click', close);
-    return () => window.removeEventListener('click', close);
-  }, [contextMenu]);
+  // ── Render ─────────────────────────────────────────────
+  const buttonStyle: React.CSSProperties = {
+    position: 'absolute', top: 10, left: 10, zIndex: 10,
+    background: '#1a1a28', color: '#e8e8f0', border: '1px solid #2a2a3e',
+    borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600,
+    cursor: 'pointer', fontFamily: "'Inter', sans-serif",
+    transition: 'background 0.15s',
+  };
+  const menuItemStyle: React.CSSProperties = {
+    padding: '7px 14px', fontSize: 12, color: '#e8e8f0', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', gap: 8, transition: 'background 0.1s',
+  };
 
   return (
-    <div style={{ width: '100%', height: '100%', background: '#0d1117' }}>
+    <>
       <ReactFlow
         nodes={nodesState}
         edges={edgesState}
@@ -541,236 +372,147 @@ const FlowCanvas: React.FC<FlowCanvasProps> = ({
         onNodeClick={handleNodeClick}
         onNodeDoubleClick={handleNodeDoubleClick}
         onNodeContextMenu={handleNodeContextMenu}
-        onPaneContextMenu={handlePaneContextMenu}
+        onPaneContextMenu={paneContextMenu}
         nodeTypes={nodeTypes}
-        minZoom={0.1}
-        maxZoom={2}
-        defaultEdgeOptions={{
-          type: 'smoothstep',
-        }}
+        minZoom={0.08}
+        maxZoom={2.5}
+        defaultEdgeOptions={{ type: 'smoothstep' }}
         proOptions={{ hideAttribution: true }}
-        onlyRenderVisibleElements={false}
-        elevateNodesOnSelect={false}
+        fitView={false}
       >
-        <Background
-          variant={BackgroundVariant.Dots}
-          gap={20}
-          size={1}
-          color="#21262d"
-        />
-        <Controls
-          style={{
-            background: '#161b22',
-            border: '1px solid #30363d',
-            borderRadius: 8,
-          }}
-          className="flow-controls"
-        />
+        <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="#1a1a28" />
+        <Controls className="flow-controls" />
         {showMinimap && (
-        <MiniMap
-          style={{
-            background: '#161b22',
-            border: '1px solid #30363d',
-            borderRadius: 8,
-          }}
-          nodeColor={(node) => {
-            const ntype = (node.data as any)?.nodeType;
-            if (ntype === 'groupBox') return 'transparent';
-            const colors: Record<string, string> = {
-              entry: '#4fc3f7',
-              exit: '#81c784',
-              condition: '#ffb74d',
-              loop: '#4dd0e1',
-              statement: '#78909c',
-              call: '#ce93d8',
-              function: '#64b5f6',
-              try: '#ef5350',
-              except: '#ff7043',
-              error: '#f44336',
-            };
-            return colors[ntype] || '#546e7a';
-          }}
-          maskColor="rgba(13, 17, 23, 0.7)"
-        />
+          <MiniMap
+            style={{ background: '#1e1e30', border: '1px solid #2a2a3e', borderRadius: 10 }}
+            maskColor="rgba(10, 10, 15, 0.7)"
+            nodeColor={(n) => {
+              const d = (n as unknown as { data?: { nodeType?: string } })?.data;
+              switch (d?.nodeType) {
+                case 'entry': return '#22c55e';
+                case 'exit': return '#ef4444';
+                case 'condition': return '#f59e0b';
+                case 'loop': return '#06b6d4';
+                case 'call': return '#a855f7';
+                default: return '#3b82f6';
+              }
+            }}
+          />
         )}
       </ReactFlow>
 
-      {/* Context menu for comment expand/collapse */}
-      {contextMenu && contextMenu.kind === 'comment' && (
+      {/* Isolation back button */}
+      {isolatedBlockId && (
         <div
-          style={{
-            position: 'fixed', left: contextMenu.x, top: contextMenu.y,
-            background: '#161b22', border: '1px solid #30363d', borderRadius: 8,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)', zIndex: 1000, overflow: 'hidden', minWidth: 140,
-          }}
-          onClick={(e) => e.stopPropagation()}
+          onClick={() => setIsolatedBlockId(null)}
+          style={{ ...buttonStyle, top: 10, left: 10 }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = '#2a2a4a')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = '#1a1a28')}
         >
-          <div style={{ padding: '6px 12px', fontSize: 11, color: '#8b949e', borderBottom: '1px solid #21262d' }}>Comment</div>
-          <div onClick={() => handleContextMenuAction('expand')} style={menuItemStyle}
-            onMouseEnter={(e) => (e.currentTarget.style.background = '#1f2937')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-            <span>📖</span> Expand
-          </div>
-          <div onClick={() => handleContextMenuAction('collapse')} style={menuItemStyle}
-            onMouseEnter={(e) => (e.currentTarget.style.background = '#1f2937')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-            <span>📕</span> Collapse
-          </div>
+          ← Back to full view
         </div>
       )}
 
+      {/* Context Menu */}
+      {contextMenu && (contextMenu.kind === 'comment') && (
+        <div className="context-menu" onClick={(e) => e.stopPropagation()}
+          style={{ left: contextMenu.x, top: contextMenu.y }}>
+          <div className="context-menu-header">Comment</div>
+          <div className="context-menu-item" onClick={() => handleContextAction('toggleComment')}>
+            {contextMenu.collapsed ? '📖 Expand' : '📕 Collapse'}
+          </div>
+        </div>
+      )}
       {contextMenu && contextMenu.kind === 'block' && contextMenu.blockIds && (
-        <div
-          style={{
-            position: 'fixed', left: contextMenu.x, top: contextMenu.y,
-            background: '#161b22', border: '1px solid #30363d', borderRadius: 8,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)', zIndex: 1000, overflow: 'hidden', minWidth: 160,
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div style={{ padding: '6px 12px', fontSize: 11, color: '#8b949e', borderBottom: '1px solid #21262d' }}>View block</div>
-          {contextMenu.blockIds.map((bid, i) => {
-            const btype = (contextMenu.blockTypes || [])[i] || 'block';
-            const labelMap: Record<string, string> = {
-              'while': 'while body', 'for': 'for body', 'if': 'if body',
-              'else': 'else body', 'try': 'try body', 'except': 'except handler',
-              'finally': 'finally', 'with': 'with block', 'match_case': 'case body',
-            };
-            return (
-              <div key={bid}
-                onClick={() => handleContextMenuAction('view', bid)}
-                style={menuItemStyle}
-                onMouseEnter={(e) => (e.currentTarget.style.background = '#1f2937')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-                <span>🔍</span> View {labelMap[btype] || btype}
-              </div>
-            );
-          })}
+        <div className="context-menu" onClick={(e) => e.stopPropagation()}
+          style={{ left: contextMenu.x, top: contextMenu.y }}>
+          <div className="context-menu-header">Navigate</div>
+          {contextMenu.blockIds.map((bid, i) => (
+            <div key={bid} className="context-menu-item" onClick={() => handleContextAction('viewBlock', bid)}>
+              <span>⊞</span> View block {i + 1}
+            </div>
+          ))}
         </div>
       )}
-
       {contextMenu && contextMenu.kind === 'functionView' && (
-        <div
-          style={{
-            position: 'fixed', left: contextMenu.x, top: contextMenu.y,
-            background: '#161b22', border: '1px solid #30363d', borderRadius: 8,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)', zIndex: 1000, overflow: 'hidden', minWidth: 160,
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div style={{ padding: '6px 12px', fontSize: 11, color: '#8b949e', borderBottom: '1px solid #21262d' }}>Method</div>
-          <div onClick={() => handleContextMenuAction('view')} style={menuItemStyle}
-            onMouseEnter={(e) => (e.currentTarget.style.background = '#1f2937')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-            <span>🔍</span> View method
+        <div className="context-menu" onClick={(e) => e.stopPropagation()}
+          style={{ left: contextMenu.x, top: contextMenu.y }}>
+          <div className="context-menu-header">Navigate</div>
+          <div className="context-menu-item" onClick={() => handleContextAction('functionView')}>
+            <span>🔍</span> View {contextMenu.callName}
           </div>
         </div>
       )}
-
-      {contextMenu && contextMenu.kind === 'findDef' && (
-        <div
-          style={{
-            position: 'fixed', left: contextMenu.x, top: contextMenu.y,
-            background: '#161b22', border: '1px solid #30363d', borderRadius: 8,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)', zIndex: 1000, overflow: 'hidden', minWidth: 160,
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div style={{ padding: '6px 12px', fontSize: 11, color: '#8b949e', borderBottom: '1px solid #21262d' }}>Navigate</div>
-          <div onClick={() => handleContextMenuAction('findDef')} style={menuItemStyle}
-            onMouseEnter={(e) => (e.currentTarget.style.background = '#1f2937')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-            <span>📍</span> Find definition
+      {contextMenu && contextMenu.kind === 'callDef' && (
+        <div className="context-menu" onClick={(e) => e.stopPropagation()}
+          style={{ left: contextMenu.x, top: contextMenu.y }}>
+          <div className="context-menu-header">Navigate</div>
+          <div className="context-menu-item" onClick={() => handleContextAction('callDef')}>
+            <span>📄</span> View definition of {contextMenu.callName}
           </div>
         </div>
       )}
-
       {contextMenu && contextMenu.kind === 'inspect' && contextMenu.inspectData && (
-        <div
-          style={{
-            position: 'fixed', left: contextMenu.x, top: contextMenu.y,
-            background: '#161b22', border: '1px solid #30363d', borderRadius: 8,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)', zIndex: 1000, overflow: 'hidden', minWidth: 160,
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div style={{ padding: '6px 12px', fontSize: 11, color: '#8b949e', borderBottom: '1px solid #21262d' }}>Inspect</div>
-          <div onClick={() => { setInspectPopup({ data: contextMenu.inspectData! }); setContextMenu(null); }} style={menuItemStyle}
-            onMouseEnter={(e) => (e.currentTarget.style.background = '#1f2937')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
+        <div className="context-menu" onClick={(e) => e.stopPropagation()}
+          style={{ left: contextMenu.x, top: contextMenu.y }}>
+          <div className="context-menu-header">Inspect</div>
+          <div className="context-menu-item" onClick={() => { setInspectPopup({ data: contextMenu.inspectData! as any }); clearMenu(); }}>
             <span>🔍</span> Inspect value
           </div>
         </div>
       )}
-
-      {/* Inspect popup overlay */}
-      {inspectPopup && (
-        <div
-          onClick={() => setInspectPopup(null)}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-            zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: '#161b22', border: '1px solid #30363d', borderRadius: 12,
-              padding: 20, maxWidth: 560, maxHeight: '70vh', overflow: 'auto',
-              boxShadow: '0 12px 48px rgba(0,0,0,0.6)',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <span style={{ color: '#58a6ff', fontWeight: 700, fontSize: 14 }}>🔍 Inspect</span>
-              <span onClick={() => setInspectPopup(null)}
-                style={{ color: '#8b949e', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>✕</span>
-            </div>
-            <pre style={{
-              color: '#c9d1d9', fontSize: 12, fontFamily: "'JetBrains Mono', 'Consolas', monospace",
-              whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0,
-              background: '#0d1117', borderRadius: 8, padding: 12,
-            }}>
-              {JSON.stringify(inspectPopup.data, null, 2)}
-            </pre>
+      {contextMenu && contextMenu.kind === 'findDef' && (
+        <div className="context-menu" onClick={(e) => e.stopPropagation()}
+          style={{ left: contextMenu.x, top: contextMenu.y }}>
+          <div className="context-menu-header">Navigate</div>
+          <div className="context-menu-item" onClick={() => handleContextAction('findDef')}>
+            <span>📍</span> Find definition
           </div>
         </div>
       )}
-
       {contextMenu && contextMenu.kind === 'pane' && (
-        <div
-          style={{
-            position: 'fixed', left: contextMenu.x, top: contextMenu.y,
-            background: '#161b22', border: '1px solid #30363d', borderRadius: 8,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)', zIndex: 1000, overflow: 'hidden', minWidth: 160,
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div style={{ padding: '6px 12px', fontSize: 11, color: '#8b949e', borderBottom: '1px solid #21262d' }}>Navigate</div>
-          <div onClick={() => handleContextMenuAction('goStart')} style={menuItemStyle}
-            onMouseEnter={(e) => (e.currentTarget.style.background = '#1f2937')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
+        <div className="context-menu" onClick={(e) => e.stopPropagation()}
+          style={{ left: contextMenu.x, top: contextMenu.y }}>
+          <div className="context-menu-header">Navigate</div>
+          <div className="context-menu-item" onClick={() => {
+            const entry = (nodesState as unknown as FlowNode[]).find(n => n.data.nodeType === 'entry');
+            if (entry && entry.position) setCenter(entry.position.x + 90, entry.position.y + 28, { zoom: getZoom(), duration: 250 });
+            clearMenu();
+          }}>
             <span>📍</span> Go to start
           </div>
         </div>
       )}
 
-      {/* Back button when isolated */}
-      {isolatedBlockId && (
-        <div style={{
-          position: 'absolute', top: 10, left: 10, zIndex: 10,
-        }}>
-          <button onClick={handleExitIsolation} style={{
-            background: '#238636', color: '#fff', border: 'none', borderRadius: 6,
-            padding: '6px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-          }}>
-            ← Back to full view
-          </button>
+      {!contextMenu && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 998, display: 'none' }}
+          onClick={clearMenu}
+        />
+      )}
+      {contextMenu && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 998, background: 'transparent' }}
+          onClick={clearMenu}
+        />
+      )}
+
+      {/* Inspect Popup */}
+      {inspectPopup && (
+        <div className="inspect-overlay" onClick={() => setInspectPopup(null)}>
+          <div className="inspect-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="inspect-header">
+              <span className="inspect-title">🔍 Inspect</span>
+              <span className="inspect-close" onClick={() => setInspectPopup(null)}>✕</span>
+            </div>
+            <pre className="inspect-content">
+              {JSON.stringify(inspectPopup.data, null, 2)}
+            </pre>
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 
-export type { FlowNodeData };
 export default FlowCanvas;

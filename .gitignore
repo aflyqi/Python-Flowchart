@@ -1,36 +1,48 @@
+# Node.js / Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+.env
+.env.*
+!.env.example
+
 # Python
 __pycache__/
 *.py[cod]
-*.egg-info/
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
 dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
 *.egg
+
+# Virtual Environments
 .venv/
 venv/
-env/
+ENV/
 
-# Node
-node_modules/
-frontend/node_modules/
-frontend/dist/
-
-# IDE
-.idea/
+# IDE / Editor config
 .vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
 *.swp
 *.swo
-*~
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Environment
-.env
-*.local
-
-# Logs
-*.log
-
-# Project specific
-*.png
-!assets/*.png
+# Local/scratch files
+tmp.py
